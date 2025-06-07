@@ -1,7 +1,6 @@
 # 工作流名称
 name: Build and Download Image Artifact
 
-# --- 核心修改部分 ---
 # 只保留手动触发，并让用户选择平台
 on:
   workflow_dispatch:
@@ -19,15 +18,12 @@ on:
 jobs:
   build-and-download:
     runs-on: ubuntu-latest
-    # 不再需要 packages: write 权限
     permissions:
       contents: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # 移除了登录到 GHCR 的步骤
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -39,34 +35,26 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          # 为本地镜像命名，并加上平台后缀
-          images: local/gateway-${{ github.event.inputs.platform }}
-          # 仍然可以为镜像保留标签，方便本地识别
-          tags: |
-            type=raw,value=latest
+          images: local/gateway-${{ replace(github.event.inputs.platform, '/', '-') }}
+          tags: type=raw,value=latest
 
-      # --- 核心修改部分 ---
       - name: Build image and export to tarball
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          # 关键：使用您手动选择的平台
           platforms: ${{ github.event.inputs.platform }}
-          # 关键：不推送到仓库
           push: false
-          # 关键：将构建结果保存为 .tar 文件
           outputs: type=docker,dest=/tmp/image.tar
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # --- 新增步骤 ---
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
-          # 关键修改：使用 replace 函数将平台名称中的 '/' 替换为 '-'
+          # 修正后的产物命名规则，将 '/' 替换为 '-'
           name: docker-image-${{ runner.os }}-${{ replace(github.event.inputs.platform, '/', '-') }}
           path: /tmp/image.tar
           retention-days: 7
