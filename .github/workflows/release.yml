@@ -25,6 +25,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # --- 新增步骤：准备一个安全的、无斜杠的平台名称 ---
+      - name: Prepare sanitized platform name
+        id: vars
+        run: |
+          # 使用 shell 语法将输入中的 '/' 替换为 '-'
+          # 例如，将 'linux/arm/v7' 转换为 'linux-arm-v7'
+          # 然后将结果保存到后续步骤可以使用的输出变量中
+          INPUT_PLATFORM="${{ github.event.inputs.platform }}"
+          echo "CLEAN_PLATFORM=${INPUT_PLATFORM//\//-}" >> $GITHUB_OUTPUT
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -35,9 +45,8 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          # --- 第 1 处修改 ---
-          # 修正语法为：github.event.inputs.platform.replace('/', '-')
-          images: local/gateway-${{ github.event.inputs.platform.replace('/', '-') }}
+          # --- 第 1 处修改：使用新准备的安全变量 ---
+          images: local/gateway-${{ steps.vars.outputs.CLEAN_PLATFORM }}
           tags: type=raw,value=latest
 
       - name: Build image and export to tarball
@@ -56,8 +65,7 @@ jobs:
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
-          # --- 第 2 处修改 ---
-          # 同样修正语法为：github.event.inputs.platform.replace('/', '-')
-          name: docker-image-${{ runner.os }}-${{ github.event.inputs.platform.replace('/', '-') }}
+          # --- 第 2 处修改：同样使用新准备的安全变量 ---
+          name: docker-image-${{ runner.os }}-${{ steps.vars.outputs.CLEAN_PLATFORM }}
           path: /tmp/image.tar
           retention-days: 7
