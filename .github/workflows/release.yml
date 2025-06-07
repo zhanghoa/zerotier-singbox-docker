@@ -35,6 +35,8 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
+          # --- 第 1 处修改 ---
+          # 修正语法为：github.event.inputs.platform.replace('/', '-')
           images: local/gateway-${{ github.event.inputs.platform.replace('/', '-') }}
           tags: type=raw,value=latest
 
@@ -54,7 +56,8 @@ jobs:
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
-          # 修正后的产物命名规则，将 '/' 替换为 '-'
+          # --- 第 2 处修改 ---
+          # 同样修正语法为：github.event.inputs.platform.replace('/', '-')
           name: docker-image-${{ runner.os }}-${{ github.event.inputs.platform.replace('/', '-') }}
           path: /tmp/image.tar
           retention-days: 7
