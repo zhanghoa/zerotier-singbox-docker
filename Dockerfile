@@ -1,5 +1,11 @@
 FROM zerotier/zerotier:latest
 
+# 声明一个构建参数，可以从 `docker build` 命令接收
+# 它的值将由 GitHub Actions 工作流在构建时动态传入
+ARG ENABLE_FORWARDING=false
+# 将这个参数的值设为容器的环境变量，以便脚本和Supervisor可以访问
+ENV ENABLE_FORWARDING=${ENABLE_FORWARDING}
+
 USER root
 
 # 安装所有依赖: supervisor, iptables, curl, iproute2
