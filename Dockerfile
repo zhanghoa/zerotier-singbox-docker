@@ -4,34 +4,37 @@
 # =================================================================
 FROM debian:12-slim AS builder
 
-# 在这个临时环境中，安装 curl 用于下载
-RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/*
-
-# 下载并安装 Sing-box，它的二进制文件会出现在 /usr/local/bin/sing-box
-RUN curl -fsSL https://sing-box.app/install.sh | sh
+# --- 核心修改部分 ---
+# 将所有操作合并到一层，并增加验证，使其更健壮
+RUN apt-get update && \
+    apt-get install -y curl ca-certificates && \
+    # 1. 先下载安装脚本，而不是直接通过管道执行
+    curl -fsSL -o /tmp/install.sh https://sing-box.app/install.sh && \
+    # 2. 执行安装脚本
+    sh /tmp/install.sh && \
+    # 3. 关键：立即验证文件是否已成功安装到目标位置
+    #    如果文件不存在，这一步会失败，构建会立即停止，错误信息会非常清晰。
+    ls -l /usr/local/bin/sing-box && \
+    # 4. 清理工作
+    rm -rf /var/lib/apt/lists/*
 
 # =================================================================
 #  阶段二 (Stage 2): 最终镜像 (Final Image)
-#  以我们需要的 ZeroTier 镜像为基础
+#  (此阶段及之后的所有内容保持不变)
 # =================================================================
 FROM zerotier/zerotier:latest
 
-# 声明和设置环境变量，逻辑保持不变
 ARG ENABLE_FORWARDING=false
 ENV ENABLE_FORWARDING=${ENABLE_FORWARDING}
 
 USER root
 
-# 只安装【运行】所必需的依赖，不再需要 curl
 RUN apt-get update && \
     apt-get install -y --no-install-recommends supervisor iproute2 iptables && \
     rm -rf /var/lib/apt/lists/*
 
-# --- 关键步骤 ---
-# 从第一阶段 (builder) 中，只把 sing-box 的可执行文件拷贝过来
 COPY --from=builder /usr/local/bin/sing-box /usr/local/bin/sing-box
 
-# 后续步骤保持完全不变
 RUN mkdir -p /etc/sing-box/ && \
     chown -R zerotier-one:zerotier-one /etc/sing-box/
 
