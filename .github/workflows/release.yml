@@ -35,7 +35,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: local/gateway-${{ replace(github.event.inputs.platform, '/', '-') }}
+          images: local/gateway-${{ github.event.inputs.platform.replace('/', '-') }}
           tags: type=raw,value=latest
 
       - name: Build image and export to tarball
@@ -55,6 +55,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           # 修正后的产物命名规则，将 '/' 替换为 '-'
-          name: docker-image-${{ runner.os }}-${{ replace(github.event.inputs.platform, '/', '-') }}
+          name: docker-image-${{ runner.os }}-${{ github.event.inputs.platform.replace('/', '-') }}
           path: /tmp/image.tar
           retention-days: 7
