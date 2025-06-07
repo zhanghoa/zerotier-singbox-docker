@@ -66,7 +66,7 @@ jobs:
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
-          # 根据您选择的平台，为产物动态命名
-          name: docker-image-${{ runner.os }}-${{ github.event.inputs.platform }}
+          # 关键修改：使用 replace 函数将平台名称中的 '/' 替换为 '-'
+          name: docker-image-${{ runner.os }}-${{ replace(github.event.inputs.platform, '/', '-') }}
           path: /tmp/image.tar
           retention-days: 7
