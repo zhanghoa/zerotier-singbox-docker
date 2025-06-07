@@ -1,20 +1,27 @@
-# STAGE 1: Builder (保持不变)
+# =================================================================
+#  STAGE 1: Builder (Final Debug Mode)
+# =================================================================
 FROM debian:12-slim AS builder
+
+# 安装所有可能的依赖
 RUN apt-get update && \
     apt-get install -y curl ca-certificates unzip coreutils && \
-    curl -fsSL -o /tmp/install.sh https://sing-box.app/install.sh && \
-    sh /tmp/install.sh && \
-    ls -l /usr/local/bin/sing-box && \
     rm -rf /var/lib/apt/lists/*
 
-# STAGE 2: Final Image
+# --- 核心调试步骤 ---
+# 我们将执行脚本的命令单独放在一个 RUN 指令中，
+# 并将标准错误（stderr）重定向到标准输出（stdout），以确保能看到所有信息
+RUN curl -fsSL -o /tmp/install.sh https://sing-box.app/install.sh && \
+    sh /tmp/install.sh 2>&1
+
+# =================================================================
+#  STAGE 2: Final Image (保持不变)
+# =================================================================
 FROM zerotier/zerotier:latest
 
 ARG ENABLE_FORWARDING=false
 ENV ENABLE_FORWARDING=${ENABLE_FORWARDING}
 
-# --- 核心修改部分 ---
-# 我们将以 root 用户完成所有配置，并让 Supervisor 以 root 身份启动
 USER root
 
 RUN apt-get update && \
@@ -30,7 +37,4 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY setup_forwarding.sh /usr/local/bin/setup_forwarding.sh
 RUN chmod +x /usr/local/bin/setup_forwarding.sh
 
-# --- 核心修改部分 ---
-# 1. 移除了最后的 `USER zerotier-one` 指令。
-# 2. 将 `CMD` 改为 `ENTRYPOINT`，从而彻底覆盖基础镜像的启动脚本。
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
