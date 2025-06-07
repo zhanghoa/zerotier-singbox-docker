@@ -1,33 +1,44 @@
+# =================================================================
+#  阶段一 (Stage 1): 构建/下载阶段 (Builder)
+#  我们使用一个临时的 Debian 镜像来下载 Sing-box
+# =================================================================
+FROM debian:12-slim AS builder
+
+# 在这个临时环境中，安装 curl 用于下载
+RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# 下载并安装 Sing-box，它的二进制文件会出现在 /usr/local/bin/sing-box
+RUN curl -fsSL https://sing-box.app/install.sh | sh
+
+# =================================================================
+#  阶段二 (Stage 2): 最终镜像 (Final Image)
+#  以我们需要的 ZeroTier 镜像为基础
+# =================================================================
 FROM zerotier/zerotier:latest
 
-# 声明一个构建参数，可以从 `docker build` 命令接收
-# 它的值将由 GitHub Actions 工作流在构建时动态传入
+# 声明和设置环境变量，逻辑保持不变
 ARG ENABLE_FORWARDING=false
-# 将这个参数的值设为容器的环境变量，以便脚本和Supervisor可以访问
 ENV ENABLE_FORWARDING=${ENABLE_FORWARDING}
 
 USER root
 
-# 安装所有依赖: supervisor, iptables, curl, iproute2
+# 只安装【运行】所必需的依赖，不再需要 curl
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl ca-certificates supervisor iproute2 iptables && \
+    apt-get install -y --no-install-recommends supervisor iproute2 iptables && \
     rm -rf /var/lib/apt/lists/*
 
-# 安装 Sing-box
-RUN curl -fsSL https://sing-box.app/install.sh | sh
+# --- 关键步骤 ---
+# 从第一阶段 (builder) 中，只把 sing-box 的可执行文件拷贝过来
+COPY --from=builder /usr/local/bin/sing-box /usr/local/bin/sing-box
 
-# 创建 Sing-box 的配置目录并赋予权限
+# 后续步骤保持完全不变
 RUN mkdir -p /etc/sing-box/ && \
     chown -R zerotier-one:zerotier-one /etc/sing-box/
 
-# 复制 Supervisor 配置文件
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# 复制转发脚本并赋予执行权限
 COPY setup_forwarding.sh /usr/local/bin/setup_forwarding.sh
 RUN chmod +x /usr/local/bin/setup_forwarding.sh
 
 USER zerotier-one
 
-# 设置容器启动时运行 Supervisor
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
